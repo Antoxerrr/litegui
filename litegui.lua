@@ -418,6 +418,145 @@ end
 function Element:move(x, y) self.x, self.y = x, y; return self end
 
 -- ============================================================
+--  LAYOUT (vbox / hbox / grid)
+-- ============================================================
+--  Контейнер с полем `layout` управляет позицией/размером детей.
+--    layout = "vbox" — стекаются вертикально
+--    layout = "hbox" — горизонтально
+--    layout = "grid" — сетка cols × rows
+--  Поля контейнера:
+--    padding — число или {t, r, b, l}
+--    gap     — отступ между детьми
+--    align   — "start"|"center"|"end"|"stretch" (поперёк main-оси)
+--    justify — "start"|"center"|"end"|"space-between" (по main-оси)
+--  Поля ребёнка:
+--    flex     — N, растягивается пропорционально оставшемуся месту
+--    absolute — true, игнорируется layout'ом (использует свои x, y, w, h)
+-- ============================================================
+
+local function parsePadding(p)
+  if not p then return 0, 0, 0, 0 end
+  if type(p) == "number" then return p, p, p, p end
+  return p.t or 0, p.r or 0, p.b or 0, p.l or 0
+end
+
+local function managedChildren(el)
+  local out = {}
+  for _, c in ipairs(el._children) do
+    if not c.absolute then out[#out+1] = c end
+  end
+  return out
+end
+
+local function layoutAxis(el, axis)
+  local pt, pr, pb, pl = parsePadding(el.padding)
+  local innerW = (el.w or 0) - pl - pr
+  local innerH = (el.h or 0) - pt - pb
+  local gap = el.gap or 0
+
+  local mainSize, crossSize, mainStart0, crossStart0
+  if axis == "v" then
+    mainSize, crossSize = innerH, innerW
+    mainStart0, crossStart0 = pt + 1, pl + 1
+  else
+    mainSize, crossSize = innerW, innerH
+    mainStart0, crossStart0 = pl + 1, pt + 1
+  end
+
+  local managed = managedChildren(el)
+  local n = #managed
+  if n == 0 then return end
+
+  -- pass 1: суммируем фиксированный размер и flex
+  local fixedMain, totalFlex = 0, 0
+  for _, c in ipairs(managed) do
+    if c.flex then totalFlex = totalFlex + c.flex
+    else
+      local cm = (axis == "v") and (c.h or 1) or (c.w or 1)
+      fixedMain = fixedMain + cm
+    end
+  end
+  local gapsTotal = gap * math.max(0, n - 1)
+  local flexSpace = math.max(0, mainSize - fixedMain - gapsTotal)
+
+  -- justify (только если нет flex — иначе flex съест весь свободный размер)
+  local justify = el.justify or "start"
+  local mainStart, extraGap = mainStart0, 0
+  if totalFlex == 0 then
+    local used = fixedMain + gapsTotal
+    if justify == "center" then
+      mainStart = mainStart0 + math.floor((mainSize - used) / 2)
+    elseif justify == "end" then
+      mainStart = mainStart0 + (mainSize - used)
+    elseif justify == "space-between" and n > 1 then
+      extraGap = math.floor((mainSize - used) / (n - 1))
+    end
+  end
+
+  local align = el.align or "stretch"
+  local pos = mainStart
+  for _, c in ipairs(managed) do
+    -- main-axis размер
+    local cMain
+    if c.flex then
+      cMain = math.floor(flexSpace * c.flex / totalFlex)
+    else
+      cMain = (axis == "v") and (c.h or 1) or (c.w or 1)
+    end
+
+    -- cross-axis размер и позиция
+    local cCross = (axis == "v") and c.w or c.h
+    local crossPos = crossStart0
+    if align == "stretch" or not cCross then
+      cCross = crossSize
+    elseif align == "center" then
+      crossPos = crossStart0 + math.floor((crossSize - cCross) / 2)
+    elseif align == "end" then
+      crossPos = crossStart0 + (crossSize - cCross)
+    end
+
+    if axis == "v" then
+      c.x, c.y, c.w, c.h = crossPos, pos, cCross, cMain
+    else
+      c.x, c.y, c.w, c.h = pos, crossPos, cMain, cCross
+    end
+    pos = pos + cMain + gap + extraGap
+  end
+end
+
+local function layoutGrid(el)
+  local pt, pr, pb, pl = parsePadding(el.padding)
+  local innerW = (el.w or 0) - pl - pr
+  local innerH = (el.h or 0) - pt - pb
+  local gap = el.gap or 0
+  local cols = el.cols or 1
+  local managed = managedChildren(el)
+  local rows = el.rows or math.ceil(#managed / math.max(1, cols))
+  if cols < 1 or rows < 1 then return end
+
+  local cellW = math.floor((innerW - gap * (cols - 1)) / cols)
+  local cellH = math.floor((innerH - gap * (rows - 1)) / rows)
+
+  for i, c in ipairs(managed) do
+    local row = math.floor((i - 1) / cols)
+    local col = (i - 1) % cols
+    c.x = pl + 1 + col * (cellW + gap)
+    c.y = pt + 1 + row * (cellH + gap)
+    c.w = c.w or cellW
+    c.h = c.h or cellH
+  end
+end
+
+local function runLayout(el)
+  if el.layout == "vbox" then layoutAxis(el, "v")
+  elseif el.layout == "hbox" then layoutAxis(el, "h")
+  elseif el.layout == "grid" then layoutGrid(el) end
+  for _, c in ipairs(el._children) do
+    runLayout(c)
+  end
+end
+
+-- ============================================================
 --  RENDERER
 -- ============================================================
 
@@ -597,6 +736,10 @@ GUI.el = setmetatable({}, {
     return function(props)
       props = props or {}
       props.type = typeName
+      -- vbox/hbox/grid авто-включают соответствующий layout
+      if typeName == "vbox" or typeName == "hbox" or typeName == "grid" then
+        props.layout = props.layout or typeName
+      end
       return Element.new(props)
     end
   end
@@ -629,8 +772,9 @@ end
 function GUI.render(root)
   local buf = Buffer.new()
   local ok, err = xpcall(function()
+    runLayout(root)
     buf:clear(root.bg or 0x000000)
-    Renderer.draw(buf, root, 0, 0)
+    Renderer.draw(buf, root, 1, 1)
     buf:flush()
   end, debug.traceback)
   if not ok then dumpError(err); error(err, 0) end
@@ -644,8 +788,9 @@ function GUI.run(root, onFrame)
 
   local function redrawUnsafe()
     if onFrame then onFrame(root) end
+    runLayout(root)
     buf:clear(root.bg or 0x000000)
-    Renderer.draw(buf, root, 0, 0)
+    Renderer.draw(buf, root, 1, 1)
     buf:flush()
   end
 
@@ -665,7 +810,7 @@ function GUI.run(root, onFrame)
     local name = ev[1]
     if name == "touch" then
       local tx, ty = ev[3], ev[4]
-      local buttons = EventLoop.collectButtons(root, 0, 0)
+      local buttons = EventLoop.collectButtons(root, 1, 1)
       local hit = EventLoop.hitTest(buttons, tx, ty)
       if hit then
         local ok, err = xpcall(hit.onClick, debug.traceback)
