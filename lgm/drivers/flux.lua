@@ -10,6 +10,10 @@ return {
   componentTypes = { "flux_plug" },
   pollInterval   = 5,
 
+  -- Несколько плагов одной сети дают одинаковые данные.
+  -- Группируем по netId — в батче останется по одной записи на сеть.
+  batchKey = function(addr, snap) return "net:" .. tostring(snap.netId) end,
+
   read = function(p)
     local info = p.getEnergyInfo()
     local net  = p.getNetworkInfo()

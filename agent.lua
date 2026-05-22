@@ -59,16 +59,25 @@ local function pollAndBroadcast(driver)
   for _, addr in ipairs(listAddresses(driver)) do
     local proxy = component.proxy(addr)
     local ok, snap = pcall(driver.read, proxy)
-    if ok then
-      batch[addr] = snap
-    else
-      batch[addr] = { _error = tostring(snap) }
+    -- Ключ в батче: по умолчанию адрес компонента; драйвер может
+    -- переопределить (см. flux.lua — дедуп по netId).
+    local key = addr
+    if ok and driver.batchKey then
+      local kok, k = pcall(driver.batchKey, addr, snap)
+      if kok and k ~= nil then key = tostring(k) end
     end
-    count = count + 1
+    if not batch[key] then
+      if ok then
+        batch[key] = snap
+      else
+        batch[key] = { _error = tostring(snap) }
+      end
+      count = count + 1
+    end
   end
   if count > 0 then
     modem.broadcast(proto.PORT, proto.encode(driver.id, NODE_ID, batch))
-    print(("  → [%s] %d component(s)"):format(driver.id, count))
+    print(("  → [%s] %d entr%s"):format(driver.id, count, count == 1 and "y" or "ies"))
   end
 end
 
