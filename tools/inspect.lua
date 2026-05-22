@@ -100,18 +100,19 @@ for _, c in ipairs(matched) do
   if not ok or not proxy then
     out("!! не удалось получить proxy:", proxy)
   else
-    -- Список методов
+    -- Список методов через component.methods (в OC они в метатаблице,
+    -- через pairs(proxy) не видны)
+    local mok, mtbl = pcall(component.methods, c.address)
     local methods = {}
-    for name in pairs(proxy) do
-      if type(proxy[name]) == "function" then
-        methods[#methods + 1] = name
-      end
+    if mok and type(mtbl) == "table" then
+      for name in pairs(mtbl) do methods[#methods + 1] = name end
     end
     table.sort(methods)
 
     out("methods (" .. #methods .. "):")
     for _, name in ipairs(methods) do
-      out("  ." .. name)
+      local mark = mtbl[name] and " [direct]" or ""
+      out("  ." .. name .. mark)
     end
 
     -- Попытка вызвать
