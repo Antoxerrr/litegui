@@ -31,7 +31,10 @@ local MANIFEST = {
     main = {
       { "litegui.lua",       "/lib/litegui.lua"      },
       { "lgm/protocol.lua",  "/lib/lgm/protocol.lua" },
-      { "listen.lua",        "/home/listen.lua"      },
+      { "lgm/state.lua",     "/lib/lgm/state.lua"    },
+      { "lgm/ui.lua",        "/lib/lgm/ui.lua"       },
+      { "dashboard.lua",     "/home/dashboard.lua"   },
+      { "listen.lua",        "/home/listen.lua"      },  -- остаётся для дебага
     },
     agent = {
       { "lgm/protocol.lua",  "/lib/lgm/protocol.lua" },

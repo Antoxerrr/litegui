@@ -21,4 +21,11 @@ return {
       liquid         = p.isActiveCooling(),
     }
   end,
+
+  -- Доступные действия. Имя действия → функция(proxy, args).
+  -- Агент вызывает их при получении cmd-пакета.
+  actions = {
+    on  = function(p) p.activate()   end,
+    off = function(p) p.deactivate() end,
+  },
 }

@@ -749,6 +749,11 @@ GUI.lerpColor = lerpColor
 GUI.darken    = darken
 GUI.clamp     = clamp
 
+-- Низкоуровневые помощники для тех, кто строит свой event-loop
+-- (например dashboard, которому надо ловить modem_message в том же цикле).
+GUI.collectButtons = function(root) return EventLoop.collectButtons(root, 1, 1) end
+GUI.hitTest        = EventLoop.hitTest
+
 -- Возвращает экран к нормальному состоянию и печатает ошибку со стек-трейсом
 local function dumpError(err)
   local w, h = gpu.getResolution()
