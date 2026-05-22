@@ -1,6 +1,9 @@
 -- Мини-тест: каждый шаг печатает чекпоинт.
 -- Где упадёт — там и проблема.
 
+local gpu = require("component").gpu
+gpu.setResolution(80, 25)
+
 local GUI = require("litegui")
 print("[1] litegui loaded")
 

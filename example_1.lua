@@ -6,6 +6,10 @@
 local GUI = require("litegui")
 local el  = GUI.el
 
+-- showcase спроектирован под 80×25, заставляем GPU работать в этом режиме
+local gpu = require("component").gpu
+gpu.setResolution(80, 25)
+
 -- ── Палитра (tailwind-esque, dark) ─────────────────────────
 local C = {
   bg       = 0x0F0F1A,
