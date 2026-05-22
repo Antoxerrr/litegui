@@ -8,6 +8,7 @@ local GUI = require("litegui")
 local el  = GUI.el
 
 local gpu = require("component").gpu
+local computer = require("computer")
 gpu.setResolution(160, 50)
 
 -- ── Палитра (tailwind-esque, dark) ─────────────────────────
@@ -98,7 +99,7 @@ p3:add(el.button { x=2, y=5, w=50, h=2,
   bg=C.accent, border=C.accent, borderStyle="rounded",
   label="reboot system", fg=0xFFFFFF,
   shadow=true, shadowColor=C.shadow,
-  onClick = function() end })
+  onClick = function() computer.shutdown(true) end })
 
 p3:add(el.button { x=2, y=8, w=50, h=2,
   bg=C.panel2, border=C.blue, borderStyle="rounded",
@@ -116,7 +117,7 @@ p3:add(el.button { x=2, y=14, w=50, h=2,
   bg=C.panel2, border=C.red, borderStyle="rounded",
   label="shutdown", fg=C.red,
   shadow=true, shadowColor=C.shadow,
-  onClick = function() end })
+  onClick = function() computer.shutdown(false) end })
 
 p3:add(el.text { x=2, y=17, text="last action: 3m ago", fg=C.dim })
 screen:add(p3)
