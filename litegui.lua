@@ -700,14 +700,16 @@ function Renderer.draw(buf, el, absX, absY)
     if el.border then
       P.border(buf, x, y, el.w, el.h, el.border, el.bg, el.borderStyle or "rounded")
     end
-    -- Скругление кнопки (chamfered rect, через half-block chars):
+    -- Скругление кнопки (barrel/lens, через дробные блоки):
     --   h=1   — ▐ слева, ▌ справа.
     --   h=2   — row 1 полный фон + ▟▙ верх; row 2 ▀ chars + ▝▘ концы.
-    --   h>=3  — полный фон (от P.rect) + 3-квадрантные углы ▟▙▜▛.
-    --           Углы съедают 1 квадрант из 4 (только внешний наружный угол),
-    --           боковины остаются полной высоты ⇒ ~75% «выпуклости».
-    --           1-квадрантные углы ▗▖▝▘ + ▄/▀ сверху/снизу давали ~50% —
-    --           кнопка выглядела как тонкая «таблетка», не как плотный rect.
+    --   h>=3  — barrel:
+    --           row 0:        cBg углы + ▂ (нижняя 1/4 cell) тонкая «губа»
+    --           row 1..h-2:   ▐/▌ полу-cell bg по бокам + полный btnBg в центре
+    --           row h-1:      cBg углы + 🮂 (верхняя 1/4 cell, U+1FB82) тонкая «крышка»
+    --           Идея: дробные ▂/🮂 обходят квадрант-сетку (▗▖▝▘ давали 50% таблетку,
+    --           ▟▙▜▛ давали Г-углы). Получается плавная пилюля как у соседа.
+    --           🮂 из Symbols for Legacy Computing — проверено что рендерится в OC unifont.
     if el.rounded and el.cornerBg and el.w >= 2 then
       local btnBg = el.bg or 0x333333
       local cBg = el.cornerBg
@@ -723,12 +725,21 @@ function Renderer.draw(buf, el, absX, absY)
         buf:set(x,             y + 1, "▝", btnBg, cBg)
         buf:set(x + el.w - 1,  y + 1, "▘", btnBg, cBg)
       else
-        -- 3-квадрантные углы: ▟ TL (top-left пустой), ▙ TR, ▜ BL, ▛ BR.
-        -- Середину верха/низа НЕ трогаем — там остаётся btnBg от P.rect.
-        buf:set(x,             y,             "▟", btnBg, cBg)
-        buf:set(x + el.w - 1,  y,             "▙", btnBg, cBg)
-        buf:set(x,             y + el.h - 1, "▜", btnBg, cBg)
-        buf:set(x + el.w - 1,  y + el.h - 1, "▛", btnBg, cBg)
+        -- Пустые углы (затираем btnBg от P.rect → cBg).
+        buf:set(x,             y,             " ", cBg, cBg)
+        buf:set(x + el.w - 1,  y,             " ", cBg, cBg)
+        buf:set(x,             y + el.h - 1, " ", cBg, cBg)
+        buf:set(x + el.w - 1,  y + el.h - 1, " ", cBg, cBg)
+        -- Тонкая губа сверху и крышка снизу — только в средних колонках.
+        for i = 1, el.w - 2 do
+          buf:set(x + i, y,             "▂", btnBg, cBg)
+          buf:set(x + i, y + el.h - 1, "🮂", btnBg, cBg)
+        end
+        -- Полу-cell бока для всех средних строк (h=3 → одна строка y+1).
+        for j = 1, el.h - 2 do
+          buf:set(x,             y + j, "▐", btnBg, cBg)
+          buf:set(x + el.w - 1,  y + j, "▌", btnBg, cBg)
+        end
       end
     end
     local lbl = el.label or ""
