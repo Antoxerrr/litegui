@@ -116,12 +116,14 @@ local function buildReactorCard(reactor, index, bus, isStale)
     el.text { x = 2, y = 8, text = "ОХЛ", fg = C.dim },
     el.text { x = 8, y = 8, text = coolantText, fg = C.cyan },
 
-    -- Кнопка h=2, плоская (без rounded) — слим-вид, не пухлая.
-    -- y=9 — отступ от низа карточки (строка 11 остаётся пустым фоном).
+    -- Кнопка h=2, скруглённая. Узкая (w=15) и отцентрована в карточке
+    -- (x=5: 5 cells пустого фона слева и справа). Для ОТКЛЮЧИТЬ (9 chars):
+    -- (15-9)/2 = 3 — отступы 3/3, идеальная симметрия.
     el.button {
-      x = 3, y = 9, w = 21, h = 2,
+      x = 6, y = 9, w = 15, h = 2,
       bg = toggleBg, fg = toggleFg,
       label = toggleLabel,
+      rounded = true, cornerBg = C.panel,
       onClick = function()
         if bus and r._node and r._addr then
           bus:sendCmd(r._node, "reactor", r._addr, toggleAction, {})
