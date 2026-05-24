@@ -101,26 +101,26 @@ local function buildReactorCard(reactor, index, bus, isStale)
     el.text { x = 2, y = 2, text = addr .. " · " .. typeStr, fg = C.dim },
 
     -- Нагрев: метка + значение в одну строку, бар ниже.
-    el.text { x = 2, y = 4, text = "НАГРЕВ", fg = C.dim },
-    el.text { x = 10, y = 4,
+    el.text { x = 2, y = 3, text = "НАГРЕВ", fg = C.dim },
+    el.text { x = 10, y = 3,
               text = (r.temp or 0) .. "/" .. (r.tempMax or 0),
               fg = tC },
-    el.progress { x = 2, y = 5, w = 21, value = tempPct, fgFill = tC, bg = C.panel2 },
+    el.progress { x = 2, y = 4, w = 21, value = tempPct, fgFill = tC, bg = C.panel2 },
 
     -- Ген и Охл — inline (label x=2, value x=8).
-    el.text { x = 2, y = 7, text = "ГЕН", fg = C.dim },
-    el.text { x = 8, y = 7,
+    el.text { x = 2, y = 6, text = "ГЕН", fg = C.dim },
+    el.text { x = 8, y = 6,
               text = fmtRF(r.gen) .. " mRF/t",
               fg = active and C.green or C.dim },
 
-    el.text { x = 2, y = 8, text = "ОХЛ", fg = C.dim },
-    el.text { x = 8, y = 8, text = coolantText, fg = C.cyan },
+    el.text { x = 2, y = 7, text = "ОХЛ", fg = C.dim },
+    el.text { x = 8, y = 7, text = coolantText, fg = C.cyan },
 
-    -- Кнопка h=3 soft pill: ▄ сверху + полный middle с лейблом + ▀ снизу,
-    -- ▗▖▝▘ по углам. Визуально 5 мини-квадратов, 3 средних — полные.
+    -- Кнопка h=4 soft pill: углы ▗▖▝▘ съедают 1 pixel сверху/снизу из 8 →
+    -- боковые столбы 6/8 = 75% высоты pill (h=3 давал 50%, выглядело резко).
     -- w=13 = "Отключить" (9) + 2/2 padding. x=7 центрирует в карточке w=25.
     el.button {
-      x = 7, y = 9, w = 13, h = 3,
+      x = 7, y = 8, w = 13, h = 4,
       bg = toggleBg, fg = toggleFg,
       label = toggleLabel,
       rounded = true, cornerBg = C.panel,
@@ -195,17 +195,17 @@ local function buildSummaryAndControl(reactors, bus)
       el.text { x = 2, y = 3,  text = "Генерация", fg = C.dim },
       el.text { x = 13, y = 3, text = fmtRF(totalGen) .. " mRF/t", fg = C.green },
 
-      -- Soft pill h=3: ▄ сверху + middle + ▀ снизу с ▗▖▝▘ углами.
-      -- w=17 = "Отключить все" (13) + 2/2 padding.
+      -- Soft pill h=4: углы съедают 1/8 высоты → боковые столбы 75%.
+      -- w=17 = "Отключить все" (13) + 2/2 padding. Panel h=14, две h=4 кнопки влезают.
       el.button {
-        x = 22, y = 5, w = 17, h = 3,
+        x = 22, y = 5, w = 17, h = 4,
         bg = C.green, fg = 0x000000,
         label = "Включить все",
         rounded = true, cornerBg = C.panel,
         onClick = bulk("on"),
       },
       el.button {
-        x = 22, y = 9, w = 17, h = 3,
+        x = 22, y = 10, w = 17, h = 4,
         bg = C.red, fg = C.white,
         label = "Отключить все",
         rounded = true, cornerBg = C.panel,
