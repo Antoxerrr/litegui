@@ -224,6 +224,7 @@ local function buildFluxPanel(fluxList)
   local f = fluxList and fluxList[1]
   if not f then
     return el.panel {
+      flex=1,
       bg=C.panel, border=C.border, title="flux network", titleFg=C.accent,
       shadow=true, shadowColor=C.shadow,
       children = {
@@ -243,6 +244,7 @@ local function buildFluxPanel(fluxList)
   local outPct = output / maxRate
 
   return el.panel {
+    flex=1,
     bg=C.panel, border=C.border,
     title="flux · " .. (f.netName or "?"),
     titleFg=C.accent,
