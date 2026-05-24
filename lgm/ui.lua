@@ -7,7 +7,7 @@
 --
 --  Layout (160×50):
 --    h=1   статус-бар (Q — выход + индикатор связи)
---    h=11  ряд из 6 компактных вертикальных карточек реакторов (≈25×11)
+--    h=12  ряд из 6 компактных вертикальных карточек реакторов (≈25×12)
 --    h=14  нижний ряд: сводка+управление | flux
 --  Снизу остаётся пустой фон — дашборду не нужны все 50 строк.
 -- ============================================================
@@ -62,7 +62,7 @@ end
 
 local function safe(v, default) if v == nil then return default end; return v end
 
--- ── Вертикальная карточка реактора (~25×11, компактная) ──
+-- ── Вертикальная карточка реактора (~25×12, компактная) ──
 local function buildReactorCard(reactor, index, bus, isStale)
   local r = reactor
   local active = safe(r.active, false)
@@ -78,7 +78,7 @@ local function buildReactorCard(reactor, index, bus, isStale)
   local coolantPct = math.min((r.coolant or 0) / cMax, 1)
   local hasCoolant = r.liquid == true
 
-  local toggleLabel  = active and "ОТКЛЮЧИТЬ" or "ВКЛЮЧИТЬ"
+  local toggleLabel  = active and "Отключить" or "Включить"
   local toggleAction = active and "off" or "on"
   local toggleBg     = active and C.red or C.green
   local toggleFg     = active and C.white or 0x000000
@@ -116,11 +116,13 @@ local function buildReactorCard(reactor, index, bus, isStale)
     el.text { x = 2, y = 8, text = "ОХЛ", fg = C.dim },
     el.text { x = 8, y = 8, text = coolantText, fg = C.cyan },
 
-    -- Кнопка h=2, скруглённая. Узкая (w=15) и отцентрована в карточке
-    -- (x=5: 5 cells пустого фона слева и справа). Для ОТКЛЮЧИТЬ (9 chars):
-    -- (15-9)/2 = 3 — отступы 3/3, идеальная симметрия.
+    -- Кнопка h=3, скруглённая. Лейбл рисуется на СРЕДНЕЙ строке (ly=y+1) —
+    -- эта строка не содержит угловых блоков ▟▙▜▛, поэтому центр визуально
+    -- совпадает с математическим. На h=2 углы съедают полцейли по верху
+    -- и текст кажется сдвинутым влево.
+    -- w=15 центрирована в карточке w=25 (5 cells фона слева/справа).
     el.button {
-      x = 6, y = 9, w = 15, h = 2,
+      x = 6, y = 9, w = 15, h = 3,
       bg = toggleBg, fg = toggleFg,
       label = toggleLabel,
       rounded = true, cornerBg = C.panel,
@@ -200,14 +202,14 @@ local function buildSummaryAndControl(reactors, bus)
       el.button {
         x = 8, y = 5, w = 46, h = 3,
         bg = C.green, fg = 0x000000,
-        label = "ВКЛЮЧИТЬ ВСЕ",
+        label = "Включить все",
         rounded = true, cornerBg = C.panel,
         onClick = bulk("on"),
       },
       el.button {
         x = 8, y = 9, w = 46, h = 3,
         bg = C.red, fg = C.white,
-        label = "ОТКЛЮЧИТЬ ВСЕ",
+        label = "Отключить все",
         rounded = true, cornerBg = C.panel,
         onClick = bulk("off"),
       },
@@ -305,7 +307,7 @@ function M.build(state, bus)
 
       -- РЕАКТОРЫ: 6 компактных вертикальных карточек в один ряд.
       el.grid {
-        h = 11, cols = 6, rows = 1, gap = 1,
+        h = 12, cols = 6, rows = 1, gap = 1,
         children = cards,
       },
 
