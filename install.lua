@@ -17,8 +17,9 @@
 --  Известные драйверы: reactor, flux
 -- ============================================================
 
-local shell = require("shell")
-local fs    = require("filesystem")
+local shell    = require("shell")
+local fs       = require("filesystem")
+local internet = require("internet")
 
 local REPO   = "Antoxerrr/litegui"
 local BRANCH = "main"
@@ -99,20 +100,45 @@ local function cleanupAlternates(dst)
   end
 end
 
+-- Качаем напрямую через internet.request с no-cache заголовками.
+-- wget в OpenOS на практике тянет stale-версию даже с query cache-buster,
+-- т.к. где-то на пути сидит кеш, игнорирующий query. Свой fetch его обходит.
+local function fetch(url)
+  local ok, reqOrErr = pcall(internet.request, url, nil, {
+    ["Cache-Control"] = "no-cache",
+    ["Pragma"]        = "no-cache",
+  })
+  if not ok then return nil, tostring(reqOrErr) end
+  local buf = {}
+  local okPull, errPull = pcall(function()
+    for chunk in reqOrErr do buf[#buf + 1] = chunk end
+  end)
+  if not okPull then return nil, tostring(errPull) end
+  return table.concat(buf)
+end
+
 local function download(src, dst)
   ensureDir(dst)
   cleanupAlternates(dst)
-  -- cache-buster, чтобы Fastly CDN не подсовывал stale-копию
+  -- cache-buster всё равно ставим — не повредит, помогает на некоторых прокси
   local url = BASE .. src .. "?v=" .. tostring(os.time())
-  -- удаляем существующий, wget -f всё равно перезапишет, но так чище
-  if fs.exists(dst) then fs.remove(dst) end
-  local ok = shell.execute(string.format('wget -fq "%s" "%s"', url, dst))
-  if ok then
-    print("  + " .. dst)
-  else
-    print("  ! FAILED " .. dst)
+  local body, err = fetch(url)
+  if not body or #body == 0 then
+    print("  ! FAILED " .. dst .. " (" .. tostring(err or "empty body") .. ")")
+    return false
   end
-  return ok
+  if fs.exists(dst) then fs.remove(dst) end
+  local f, ferr = io.open(dst, "w")
+  if not f then
+    print("  ! FAILED " .. dst .. " (open: " .. tostring(ferr) .. ")")
+    return false
+  end
+  f:write(body); f:close()
+  -- небольшой sanity-вывод: размер + первая строка, чтобы видеть что приехало
+  local head = body:match("[^\r\n]*") or ""
+  if #head > 60 then head = head:sub(1, 60) .. "…" end
+  print(("  + %s  [%d B]  %s"):format(dst, #body, head))
+  return true
 end
 
 -- ── parse args ───────────────────────────────────────────
