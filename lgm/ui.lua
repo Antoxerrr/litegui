@@ -6,9 +6,9 @@
 --    bus   — объект с :sendCmd(nodeId, driverId, target, action, args)
 --
 --  Layout (160×50):
---    header h=3
---    grid реакторов 3×2 h=21 (карточки 52×10)
---    нижний ряд h=24: сводка | управление | flux
+--    h=1   статус-бар (Q — выход + индикатор связи)
+--    h=33  ряд из 6 вертикальных карточек реакторов (≈25×33 каждая)
+--    h=14  нижний ряд: сводка+управление | flux
 -- ============================================================
 local GUI = require("litegui")
 local el  = GUI.el
@@ -22,16 +22,14 @@ local C = {
   panel    = 0x0A0A12,   -- фон карточки (почти чёрный)
   panel2   = 0x1E1E2A,   -- фон прогресс-бара
   panel3   = 0x14141C,   -- фон пустого слота
-  shadow   = 0x05050A,
   accent   = 0x8B5CF6,
-  blue     = 0x3B82F6,
   green    = 0x22C55E,
   yellow   = 0xEAB308,
   orange   = 0xF97316,
   red      = 0xEF4444,
   cyan     = 0x06B6D4,
   white    = 0xF8FAFC,
-  dim      = 0x8088A0,   -- чуть ярче на сером фоне
+  dim      = 0x8088A0,
   dimmer   = 0x4A4F60,
 }
 M.colors = C
@@ -63,7 +61,7 @@ end
 
 local function safe(v, default) if v == nil then return default end; return v end
 
--- ── Карточка одного реактора (52×10) ─────────────────────
+-- ── Вертикальная карточка реактора (~25×33) ──────────────
 local function buildReactorCard(reactor, index, bus, isStale)
   local r = reactor
   local active = safe(r.active, false)
@@ -88,53 +86,61 @@ local function buildReactorCard(reactor, index, bus, isStale)
   local typeStr = (hasCoolant and "Fluid" or "Air") .. " · L" .. tostring(r.level or 0)
   local addr = (r._addr or "?"):sub(1, 8)
 
+  -- badge ширина: " ВКЛ "=5, " ВЫКЛ "=6 — пинуем к правому краю карточки.
+  local badgeLen = active and 5 or 6
+  local badgeX = 25 - badgeLen
+
+  local children = {
+    el.badge { x = badgeX, y = 1, label = statusText, bg = statusBg, fg = statusFg },
+
+    el.text { x = 2, y = 2, text = addr,    fg = C.dim },
+    el.text { x = 2, y = 3, text = typeStr, fg = C.dim },
+
+    el.text { x = 2, y = 5, text = "НАГРЕВ", fg = C.dim },
+    el.text { x = 2, y = 6,
+              text = (r.temp or 0) .. "/" .. (r.tempMax or 0),
+              fg = tC },
+    el.progress { x = 2, y = 7, w = 21, value = tempPct, fgFill = tC, bg = C.panel2 },
+
+    el.text { x = 2, y = 10, text = "ГЕНЕРАЦИЯ", fg = C.dim },
+    el.text { x = 2, y = 11,
+              text = fmtRF(r.gen) .. " mRF/t",
+              fg = active and C.green or C.dim },
+
+    el.text { x = 2, y = 14, text = "ОХЛАЖДЕНИЕ", fg = C.dim },
+    el.text { x = 2, y = 15,
+              text = hasCoolant
+                     and (fmtMb(r.coolant) .. "/" .. fmtMb(r.coolantMax) .. " mb")
+                     or  ((r.coolantConsume or 0) .. " mb/s"),
+              fg = C.cyan },
+  }
+  if hasCoolant then
+    children[#children+1] = el.progress {
+      x = 2, y = 16, w = 21, value = coolantPct, fgFill = C.cyan, bg = C.panel2,
+    }
+  end
+
+  -- Кнопка прижата к низу карточки. h=33, кнопка h=2 на y=31..32.
+  -- w=21 (нечётная): ОТКЛЮЧИТЬ (9, нечёт) центрируется идеально;
+  -- ВКЛЮЧИТЬ (8, чёт) — ±1 пиксель, неизбежно в моноширинном.
+  children[#children+1] = el.button {
+    x = 3, y = 31, w = 21, h = 2,
+    bg = toggleBg, fg = toggleFg,
+    label = toggleLabel,
+    rounded = true, cornerBg = C.panel,
+    onClick = function()
+      if bus and r._node and r._addr then
+        bus:sendCmd(r._node, "reactor", r._addr, toggleAction, {})
+      end
+    end,
+  }
+
   return el.panel {
     bg = isStale and C.panel3 or C.panel,
     title = title,
     titleFg = isStale and C.dim or C.accent,
     rounded = true, cornerBg = C.bg,
-    children = {
-      -- Статус-бэдж в правом верхнем углу
-      el.badge { x = 52 - 6, y = 1, label = statusText, bg = statusBg, fg = statusFg },
-
-      -- Адрес + тип
-      el.text { x = 2, y = 2, text = addr .. " · " .. typeStr, fg = C.dim },
-
-      -- Нагрев + value
-      el.text { x = 2, y = 3, text = "Нагрев", fg = C.dim },
-      el.text { x = 10, y = 3,
-                text = (r.temp or 0) .. "/" .. (r.tempMax or 0) .. " °C",
-                fg = tC },
-      el.progress { x = 2, y = 4, w = 48, value = tempPct, fgFill = tC, bg = C.panel2 },
-
-      -- Генерация
-      el.text { x = 2, y = 5, text = "Ген", fg = C.dim },
-      el.text { x = 10, y = 5,
-                text = fmtRF(r.gen) .. " mRF/t",
-                fg = active and C.green or C.dim },
-
-      -- Охлаждение / расход
-      el.text { x = 2, y = 6, text = "Охлад", fg = C.dim },
-      el.text { x = 10, y = 6,
-                text = hasCoolant
-                       and (fmtMb(r.coolant) .. "/" .. fmtMb(r.coolantMax) .. " mb")
-                       or  ((r.coolantConsume or 0) .. " mb/s"),
-                fg = C.cyan },
-
-      -- Кнопка вкл/выкл — залитая, со скруглением.
-      -- Нечётная ширина 47 + label 9 символов = симметричные отступы (19+19).
-      el.button {
-        x = 3, y = 8, w = 47, h = 2,
-        bg = toggleBg, fg = toggleFg,
-        label = toggleLabel,
-        rounded = true, cornerBg = C.panel,
-        onClick = function()
-          if bus and r._node and r._addr then
-            bus:sendCmd(r._node, "reactor", r._addr, toggleAction, {})
-          end
-        end,
-      },
-    }
+    children = children,
   }
 end
 
@@ -146,47 +152,21 @@ local function buildEmptySlot(index)
     titleFg = C.dim,
     rounded = true, cornerBg = C.bg,
     children = {
-      el.text { x = 2, y = 5, text = "не подключён", fg = C.dimmer },
+      el.text { x = 2, y = 16, text = "не подключён", fg = C.dimmer },
     }
   }
 end
 
--- ── Сводка по реакторам ──────────────────────────────────
-local function buildReactorsSummary(reactors)
-  local totalGen, hot, hotLim = 0, 0, 1
-  local onCount = 0
+-- ── Сводка + Управление (объединено) ─────────────────────
+local function buildSummaryAndControl(reactors, bus)
+  local totalGen = 0
+  local onCount  = 0
   for _, r in ipairs(reactors) do
     totalGen = totalGen + (r.gen or 0)
     if r.active then onCount = onCount + 1 end
-    local t, tm = r.temp or 0, math.max(r.tempMax or 1, 1)
-    if t / tm > hot / math.max(hotLim, 1) then hot, hotLim = t, tm end
   end
 
-  return el.panel {
-    w = 50,
-    bg = C.panel, title = "Сводка", titleFg = C.accent,
-    rounded = true, cornerBg = C.bg,
-    children = {
-      el.text { x = 2, y = 2, text = "Активны",  fg = C.dim },
-      el.text { x = 13, y = 2,
-                text = onCount .. " / " .. #reactors,
-                fg = onCount > 0 and C.green or C.dim },
-
-      el.text { x = 2, y = 4, text = "Генерация", fg = C.dim },
-      el.text { x = 13, y = 4, text = fmtRF(totalGen) .. " mRF/t", fg = C.green },
-
-      el.text { x = 2, y = 6, text = "Макс нагрев", fg = C.dim },
-      el.text { x = 14, y = 6, text = hot .. "/" .. hotLim,
-                fg = tempColor(hot, hotLim) },
-      el.progress { x = 2, y = 7, w = 46,
-                    value = hot / math.max(hotLim, 1),
-                    fgFill = tempColor(hot, hotLim), bg = C.panel2 },
-    }
-  }
-end
-
--- ── Bulk-кнопки управления ───────────────────────────────
-local function buildBulkControls(reactors, bus)
+  -- Уникальные ноды для bulk-команды.
   local nodes = {}
   for _, r in ipairs(reactors) do
     if r._node then nodes[r._node] = true end
@@ -203,20 +183,32 @@ local function buildBulkControls(reactors, bus)
     end
   end
 
+  -- Панель w=60, кнопки w=46 (две колонки по 28+gap не влезут красиво — оставляем
+  -- по одной в строке для крупных тач-зон).
   return el.panel {
-    w = 40,
-    bg = C.panel, title = "Управление", titleFg = C.accent,
+    w = 60,
+    bg = C.panel, title = "Сводка", titleFg = C.accent,
     rounded = true, cornerBg = C.bg,
     children = {
+      el.text { x = 2, y = 2,  text = "Активны",   fg = C.dim },
+      el.text { x = 13, y = 2,
+                text = onCount .. " / " .. #reactors,
+                fg = onCount > 0 and C.green or C.dim },
+
+      el.text { x = 2, y = 3,  text = "Генерация", fg = C.dim },
+      el.text { x = 13, y = 3, text = fmtRF(totalGen) .. " mRF/t", fg = C.green },
+
+      -- Кнопки. w=46 (чёт): ВКЛЮЧИТЬ ВСЕ (12, чёт) — идеально по центру;
+      -- ОТКЛЮЧИТЬ ВСЕ (13, нечёт) — ±1.
       el.button {
-        x = 2, y = 2, w = 36, h = 3,
+        x = 8, y = 5, w = 46, h = 3,
         bg = C.green, fg = 0x000000,
         label = "ВКЛЮЧИТЬ ВСЕ",
         rounded = true, cornerBg = C.panel,
         onClick = bulk("on"),
       },
       el.button {
-        x = 2, y = 6, w = 36, h = 3,
+        x = 8, y = 9, w = 46, h = 3,
         bg = C.red, fg = C.white,
         label = "ОТКЛЮЧИТЬ ВСЕ",
         rounded = true, cornerBg = C.panel,
@@ -226,7 +218,7 @@ local function buildBulkControls(reactors, bus)
   }
 end
 
--- ── Flux network panel ───────────────────────────────────
+-- ── Flux network panel (компактная: 3 строки данных) ─────
 local function buildFluxPanel(fluxList)
   local f = fluxList and fluxList[1]
   if not f then
@@ -241,12 +233,8 @@ local function buildFluxPanel(fluxList)
     }
   end
 
-  local input  = f.energyInput  or 0
-  local output = f.energyOutput or 0
-  local balance = input - output
-  local balanceColor = balance >= 0 and C.green or C.red
-  local balanceText = (balance >= 0 and "+" or "") .. fmtRF(balance)
-
+  local input   = f.energyInput  or 0
+  local output  = f.energyOutput or 0
   local maxRate = math.max(input, output, 1)
 
   return el.panel {
@@ -260,18 +248,15 @@ local function buildFluxPanel(fluxList)
                 text = "id " .. tostring(f.netId) .. " · " .. (f.energyType or ""),
                 fg = C.dim },
 
-      el.text { x = 2, y = 4, text = "Приход", fg = C.dim },
+      el.text { x = 2, y = 4,  text = "Приход", fg = C.dim },
       el.text { x = 11, y = 4, text = fmtRF(input) .. " mRF/t", fg = C.green },
-      el.progress { x = 2, y = 5, w = 64, value = input / maxRate,
+      el.progress { x = 2, y = 5, w = 90, value = input / maxRate,
                     fgFill = C.green, bg = C.panel2 },
 
-      el.text { x = 2, y = 7, text = "Расход", fg = C.dim },
+      el.text { x = 2, y = 7,  text = "Расход", fg = C.dim },
       el.text { x = 11, y = 7, text = fmtRF(output) .. " mRF/t", fg = C.yellow },
-      el.progress { x = 2, y = 8, w = 64, value = output / maxRate,
+      el.progress { x = 2, y = 8, w = 90, value = output / maxRate,
                     fgFill = C.yellow, bg = C.panel2 },
-
-      el.text { x = 2, y = 10, text = "Баланс", fg = C.dim },
-      el.text { x = 11, y = 10, text = balanceText .. " mRF/t", fg = balanceColor },
     }
   }
 end
@@ -283,7 +268,7 @@ function M.build(state, bus)
   local reactors = state.reactorList()
   local flux     = state.fluxList()
 
-  -- 6 карточек (3×2). Слоты без реакторов — пустые.
+  -- 6 вертикальных карточек в один ряд.
   local cards = {}
   for i = 1, 6 do
     local r = reactors[i]
@@ -294,7 +279,7 @@ function M.build(state, bus)
     end
   end
 
-  -- Статус связи
+  -- Статус связи.
   local headerStatus = "НЕТ СВЯЗИ"
   local headerStatusColor = C.red
   local headerStatusFg = C.white
@@ -311,7 +296,7 @@ function M.build(state, bus)
     x = 1, y = 1, w = 160, h = 50, bg = C.bg,
     layout = "vbox", gap = 1,
     children = {
-      -- Тонкая шапка с подсказкой + индикатор связи
+      -- Тонкая шапка: подсказка + индикатор связи (прижато к правому краю).
       el.rect {
         h = 1, bg = C.bg,
         children = {
@@ -321,18 +306,17 @@ function M.build(state, bus)
         }
       },
 
-      -- РЕАКТОРЫ
+      -- РЕАКТОРЫ: 6 вертикальных карточек в один ряд.
       el.grid {
-        h = 23, cols = 3, rows = 2, gap = 1,
+        h = 33, cols = 6, rows = 1, gap = 1,
         children = cards,
       },
 
-      -- НИЖНИЙ РЯД
+      -- НИЖНИЙ РЯД: Сводка+Управление | Flux.
       el.hbox {
         flex = 1, gap = 1,
         children = {
-          buildReactorsSummary(reactors),
-          buildBulkControls(reactors, bus),
+          buildSummaryAndControl(reactors, bus),
           buildFluxPanel(flux),
         }
       },
