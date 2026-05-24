@@ -15,14 +15,15 @@ local el  = GUI.el
 
 local M = {}
 
--- ── Палитра (насыщенная) ─────────────────────────────────
+-- ── Палитра ─────────────────────────────────────────────
+-- Тёмно-чёрные карточки на серо-синем фоне.
 local C = {
-  bg       = 0x0B0B14,   -- фон экрана
-  panel    = 0x1B1B30,   -- фон карточки
-  panel2   = 0x2A2A45,   -- фон прогресс-бара
-  panel3   = 0x14141F,   -- фон пустого слота
+  bg       = 0x3A3A48,   -- главный фон (серый)
+  panel    = 0x0A0A12,   -- фон карточки (почти чёрный)
+  panel2   = 0x1E1E2A,   -- фон прогресс-бара
+  panel3   = 0x14141C,   -- фон пустого слота
   shadow   = 0x05050A,
-  accent   = 0x8B5CF6,   -- фиолетовый, плотный
+  accent   = 0x8B5CF6,
   blue     = 0x3B82F6,
   green    = 0x22C55E,
   yellow   = 0xEAB308,
@@ -30,8 +31,8 @@ local C = {
   red      = 0xEF4444,
   cyan     = 0x06B6D4,
   white    = 0xF8FAFC,
-  dim      = 0x6B7280,
-  dimmer   = 0x374151,
+  dim      = 0x8088A0,   -- чуть ярче на сером фоне
+  dimmer   = 0x4A4F60,
 }
 M.colors = C
 
@@ -120,9 +121,10 @@ local function buildReactorCard(reactor, index, bus, isStale)
                        or  ((r.coolantConsume or 0) .. " mb/s"),
                 fg = C.cyan },
 
-      -- Кнопка вкл/выкл — залитая, со скруглением
+      -- Кнопка вкл/выкл — залитая, со скруглением.
+      -- Нечётная ширина 47 + label 9 символов = симметричные отступы (19+19).
       el.button {
-        x = 2, y = 8, w = 48, h = 2,
+        x = 3, y = 8, w = 47, h = 2,
         bg = toggleBg, fg = toggleFg,
         label = toggleLabel,
         rounded = true, cornerBg = C.panel,
@@ -309,20 +311,19 @@ function M.build(state, bus)
     x = 1, y = 1, w = 160, h = 50, bg = C.bg,
     layout = "vbox", gap = 1,
     children = {
-      -- HEADER
-      el.gradient {
-        h = 3, direction = "v", from = 0x2E2E55, to = C.panel,
+      -- Тонкая шапка с подсказкой + индикатор связи
+      el.rect {
+        h = 1, bg = C.bg,
         children = {
-          el.text  { x = 4,   y = 2, text = "▎ LiteGUI · Реакторы", fg = C.accent },
-          el.badge { x = 144, y = 2, label = headerStatus,
+          el.text  { x = 132, y = 1, text = "Q — выход", fg = C.dim },
+          el.badge { x = 144, y = 1, label = headerStatus,
                      bg = headerStatusColor, fg = headerStatusFg },
-          el.text  { x = 130, y = 2, text = "Q — выход", fg = C.dim },
         }
       },
 
       -- РЕАКТОРЫ
       el.grid {
-        h = 21, cols = 3, rows = 2, gap = 1,
+        h = 23, cols = 3, rows = 2, gap = 1,
         children = cards,
       },
 
