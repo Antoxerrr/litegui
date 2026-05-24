@@ -700,12 +700,15 @@ function Renderer.draw(buf, el, absX, absY)
     if el.border then
       P.border(buf, x, y, el.w, el.h, el.border, el.bg, el.borderStyle or "rounded")
     end
-    -- Скругление кнопки:
-    --   h=1       — pill: ▐ слева, ▌ справа (полуцейли по бокам).
-    --   h=2       — soft pill: row 1 — лейбл на полном фоне с углами ▟▙ сверху;
-    --               row 2 — ▀ chars (верх=кнопка, низ=панель) с ▝▘ по углам.
-    --               Визуальная высота ~1.5 char-row — компактно и аккуратно.
-    --   h>=3      — классические квадрант-углы ▟▙▜▛ (label на средней строке).
+    -- Скругление кнопки (soft pill, через half-block chars):
+    --   h=1   — ▐ слева, ▌ справа.
+    --   h=2   — row 1 полный фон + ▟▙ верх; row 2 ▀ chars + ▝▘ концы.
+    --           Визуально: 3 mini-quad'а высоты (1 top half + 2 middle).
+    --   h>=3  — row 1 ▄ chars + ▗▖ концы; rows 2..h-1 полный фон с лейблом;
+    --           row h ▀ chars + ▝▘ концы.
+    --           Для h=3: 5 mini-quad'ов высоты (1 ▄ + 2 mid + 2 mid + 1 ▀ wait,
+    --           это 1+2+1 = 4. Правильнее: 1 ▄ bottom-half + полная строка = 3,
+    --           + 1 ▀ top-half = всего 4 visible quad'а tall, 2 full + 2 tapered).
     if el.rounded and el.cornerBg and el.w >= 2 then
       local btnBg = el.bg or 0x333333
       local cBg = el.cornerBg
@@ -713,21 +716,25 @@ function Renderer.draw(buf, el, absX, absY)
         buf:set(x,             y, "▐", btnBg, cBg)
         buf:set(x + el.w - 1,  y, "▌", btnBg, cBg)
       elseif el.h == 2 then
-        -- Нижнюю строку перекрашиваем в ▀ (упрощённо: проходим по всей ширине).
         for i = 0, el.w - 1 do
           buf:set(x + i, y + 1, "▀", btnBg, cBg)
         end
-        -- Верхние углы (label row): notch по внешним углам.
         buf:set(x,             y,     "▟", btnBg, cBg)
         buf:set(x + el.w - 1,  y,     "▙", btnBg, cBg)
-        -- Нижние углы (▀ row): только один внутренний квадрант — мягкий загиб.
         buf:set(x,             y + 1, "▝", btnBg, cBg)
         buf:set(x + el.w - 1,  y + 1, "▘", btnBg, cBg)
       else
-        buf:set(x,             y,             "▟", btnBg, cBg)
-        buf:set(x + el.w - 1,  y,             "▙", btnBg, cBg)
-        buf:set(x,             y + el.h - 1,  "▜", btnBg, cBg)
-        buf:set(x + el.w - 1,  y + el.h - 1,  "▛", btnBg, cBg)
+        -- Верхняя строка: ▄ chars (top-half панель, bottom-half кнопка).
+        -- Нижняя строка: ▀ chars (top-half кнопка, bottom-half панель).
+        for i = 0, el.w - 1 do
+          buf:set(x + i, y,            "▄", btnBg, cBg)
+          buf:set(x + i, y + el.h - 1, "▀", btnBg, cBg)
+        end
+        -- Скруглённые концы: ▗▖ сверху, ▝▘ снизу.
+        buf:set(x,             y,             "▗", btnBg, cBg)
+        buf:set(x + el.w - 1,  y,             "▖", btnBg, cBg)
+        buf:set(x,             y + el.h - 1, "▝", btnBg, cBg)
+        buf:set(x + el.w - 1,  y + el.h - 1, "▘", btnBg, cBg)
       end
     end
     local lbl = el.label or ""
