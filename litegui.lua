@@ -97,55 +97,73 @@ end
 -- ============================================================
 --  BUFFER  (с half-block пиксельным слоем)
 -- ============================================================
---  Ячейка хранит {ch, fg, bg}. Пиксельные операции работают через
---  символ "▀": fg = верхний пиксель, bg = нижний.
+--  Хранение: три плоских массива (ch, fg, bg), индексированные
+--  i = (y-1)*w + x. Это в ~6× компактнее, чем таблица-на-ячейку,
+--  потому что Lua кладёт целочисленные индексы в array-part.
+--
+--  Пиксели: символ "▀" = fg верхний пиксель, bg нижний.
 --  pixel (px, py)  →  cellX = px, cellY = ceil(py/2), top = (py%2==1)
 
 local Buffer = {}
 Buffer.__index = Buffer
 
+local function fillBuf(buf, ch, fg, bg, n)
+  for i = 1, n do
+    buf.ch[i] = ch
+    buf.fg[i] = fg
+    buf.bg[i] = bg
+  end
+end
+
 function Buffer.new()
   local w, h = gpu.getResolution()
+  local n = w * h
   local self = setmetatable({
-    w = w, h = h,
+    w = w, h = h, n = n,
     pw = w, ph = h * 2,
-    cur  = {},
-    next = {},
+    cur  = { ch = {}, fg = {}, bg = {} },
+    next = { ch = {}, fg = {}, bg = {} },
   }, Buffer)
-  for y = 1, h do
-    self.cur[y]  = {}
-    self.next[y] = {}
-    for x = 1, w do
-      self.cur[y][x]  = {fg=0xFFFFFF, bg=0x000000, ch=" "}
-      self.next[y][x] = {fg=0xFFFFFF, bg=0x000000, ch=" "}
-    end
-  end
+  fillBuf(self.cur,  " ", 0xFFFFFF, 0x000000, n)
+  fillBuf(self.next, " ", 0xFFFFFF, 0x000000, n)
   return self
 end
 
 function Buffer:set(x, y, ch, fg, bg)
-  x, y = math.floor(x), math.floor(y)
+  x = x >= 0 and math.floor(x) or math.ceil(x)
+  y = y >= 0 and math.floor(y) or math.ceil(y)
   if x < 1 or y < 1 or x > self.w or y > self.h then return end
-  local cell = self.next[y][x]
-  if ch then cell.ch = ch end
-  if fg then cell.fg = fg end
-  if bg then cell.bg = bg end
+  local i = (y - 1) * self.w + x
+  local nx = self.next
+  if ch then nx.ch[i] = ch end
+  if fg then nx.fg[i] = fg end
+  if bg then nx.bg[i] = bg end
 end
 
 function Buffer:fill(x, y, w, h, ch, fg, bg)
-  for dy = 0, h-1 do
-    for dx = 0, w-1 do
-      self:set(x+dx, y+dy, ch, fg, bg)
+  local bw, bh = self.w, self.h
+  local nx_ch, nx_fg, nx_bg = self.next.ch, self.next.fg, self.next.bg
+  local x0 = math.max(1, math.floor(x))
+  local y0 = math.max(1, math.floor(y))
+  local x1 = math.min(bw, math.floor(x) + w - 1)
+  local y1 = math.min(bh, math.floor(y) + h - 1)
+  for yy = y0, y1 do
+    local base = (yy - 1) * bw
+    for xx = x0, x1 do
+      local i = base + xx
+      if ch then nx_ch[i] = ch end
+      if fg then nx_fg[i] = fg end
+      if bg then nx_bg[i] = bg end
     end
   end
 end
 
--- Из ячейки достаём (top, bottom) — цвета двух «пикселей»
-local function decodeCell(cell)
-  if cell.ch == "▀" then return cell.fg, cell.bg
-  elseif cell.ch == "▄" then return cell.bg, cell.fg
-  elseif cell.ch == " " or cell.ch == "█" then return cell.bg, cell.bg
-  else return cell.bg, cell.bg end
+-- Из ячейки достаём (top, bottom) — цвета двух «пикселей».
+local function decodeCellAt(nx, i)
+  local ch, fg, bg = nx.ch[i], nx.fg[i], nx.bg[i]
+  if ch == "▀" then return fg, bg
+  elseif ch == "▄" then return bg, fg
+  else return bg, bg end
 end
 
 function Buffer:setPixel(px, py, color)
@@ -153,33 +171,61 @@ function Buffer:setPixel(px, py, color)
   if px < 1 or py < 1 or px > self.pw or py > self.ph then return end
   local cellY = math.ceil(py / 2)
   local isTop = (py % 2 == 1)
-  local cell = self.next[cellY][px]
-  local top, bot = decodeCell(cell)
+  local i = (cellY - 1) * self.w + px
+  local nx = self.next
+  local top, bot = decodeCellAt(nx, i)
   if isTop then top = color else bot = color end
   if top == bot then
-    cell.ch, cell.fg, cell.bg = " ", 0xFFFFFF, top
+    nx.ch[i] = " "; nx.fg[i] = 0xFFFFFF; nx.bg[i] = top
   else
-    cell.ch, cell.fg, cell.bg = "▀", top, bot
+    nx.ch[i] = "▀"; nx.fg[i] = top; nx.bg[i] = bot
   end
 end
 
 function Buffer:clear(bg)
   bg = bg or 0x000000
-  self:fill(1, 1, self.w, self.h, " ", 0xFFFFFF, bg)
+  fillBuf(self.next, " ", 0xFFFFFF, bg, self.n)
 end
 
--- На GPU выливаем только изменившиеся ячейки
+-- На GPU выливаем только изменившиеся ячейки, склеивая соседние
+-- ячейки с одинаковыми fg/bg в один gpu.set(x,y,"строка").
 function Buffer:flush()
-  local curFg, curBg
-  for y = 1, self.h do
-    for x = 1, self.w do
-      local n = self.next[y][x]
-      local c = self.cur[y][x]
-      if n.ch ~= c.ch or n.fg ~= c.fg or n.bg ~= c.bg then
-        if n.fg ~= curFg then gpu.setForeground(n.fg); curFg = n.fg end
-        if n.bg ~= curBg then gpu.setBackground(n.bg); curBg = n.bg end
-        gpu.set(x, y, n.ch)
-        c.ch, c.fg, c.bg = n.ch, n.fg, n.bg
+  local w, h = self.w, self.h
+  local cur, nx = self.cur, self.next
+  local cur_ch, cur_fg, cur_bg = cur.ch, cur.fg, cur.bg
+  local nx_ch,  nx_fg,  nx_bg  = nx.ch,  nx.fg,  nx.bg
+  local lastFg, lastBg
+
+  for y = 1, h do
+    local base = (y - 1) * w
+    local x = 1
+    while x <= w do
+      local i = base + x
+      local nch, nfg, nbg = nx_ch[i], nx_fg[i], nx_bg[i]
+      if nch ~= cur_ch[i] or nfg ~= cur_fg[i] or nbg ~= cur_bg[i] then
+        -- начало run-а: копим соседей с теми же fg/bg
+        local runStart = x
+        local parts = { nch }
+        cur_ch[i], cur_fg[i], cur_bg[i] = nch, nfg, nbg
+        local xx = x + 1
+        while xx <= w do
+          local j = base + xx
+          local mch, mfg, mbg = nx_ch[j], nx_fg[j], nx_bg[j]
+          if mfg ~= nfg or mbg ~= nbg then break end
+          if mch == cur_ch[j] and mfg == cur_fg[j] and mbg == cur_bg[j] then
+            -- ячейка не изменилась → run обрывать дешевле, чем перерисовывать впустую
+            break
+          end
+          parts[#parts + 1] = mch
+          cur_ch[j], cur_fg[j], cur_bg[j] = mch, mfg, mbg
+          xx = xx + 1
+        end
+        if nfg ~= lastFg then gpu.setForeground(nfg); lastFg = nfg end
+        if nbg ~= lastBg then gpu.setBackground(nbg); lastBg = nbg end
+        gpu.set(runStart, y, table.concat(parts))
+        x = xx
+      else
+        x = x + 1
       end
     end
   end
