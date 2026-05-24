@@ -19,6 +19,27 @@ local computer  = require("computer")
 local event     = require("event")
 local proto     = require("lgm.protocol")
 
+-- Sanity check: если /lib/lgm/protocol.lua устарел (без encodeSnap),
+-- падаем сразу с понятным сообщением, а не циклом «nil value» из главной петли.
+do
+  local need = { "encodeSnap", "encodeCmd", "decode", "PORT" }
+  local missing = {}
+  for _, k in ipairs(need) do
+    if proto[k] == nil then missing[#missing+1] = k end
+  end
+  if #missing > 0 then
+    local have = {}
+    for k in pairs(proto) do have[#have+1] = k end
+    io.stderr:write(
+      "agent: stale lgm.protocol — missing: " .. table.concat(missing, ", ") .. "\n" ..
+      "       found fields: " .. table.concat(have, ", ") .. "\n" ..
+      "       run: install.lua agent reactor flux  (and restart this script)\n"
+    )
+    os.exit(1)
+  end
+end
+
+
 -- ── Drivers ──────────────────────────────────────────────
 local drivers = {}
 local function registerDriver(d)
