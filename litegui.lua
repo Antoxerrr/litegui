@@ -700,15 +700,14 @@ function Renderer.draw(buf, el, absX, absY)
     if el.border then
       P.border(buf, x, y, el.w, el.h, el.border, el.bg, el.borderStyle or "rounded")
     end
-    -- Скругление кнопки (soft pill, через half-block chars):
+    -- Скругление кнопки (chamfered rect, через half-block chars):
     --   h=1   — ▐ слева, ▌ справа.
     --   h=2   — row 1 полный фон + ▟▙ верх; row 2 ▀ chars + ▝▘ концы.
-    --           Визуально: 3 mini-quad'а высоты (1 top half + 2 middle).
-    --   h>=3  — row 1 ▄ chars + ▗▖ концы; rows 2..h-1 полный фон с лейблом;
-    --           row h ▀ chars + ▝▘ концы.
-    --           Для h=3: 5 mini-quad'ов высоты (1 ▄ + 2 mid + 2 mid + 1 ▀ wait,
-    --           это 1+2+1 = 4. Правильнее: 1 ▄ bottom-half + полная строка = 3,
-    --           + 1 ▀ top-half = всего 4 visible quad'а tall, 2 full + 2 tapered).
+    --   h>=3  — полный фон (от P.rect) + 3-квадрантные углы ▟▙▜▛.
+    --           Углы съедают 1 квадрант из 4 (только внешний наружный угол),
+    --           боковины остаются полной высоты ⇒ ~75% «выпуклости».
+    --           1-квадрантные углы ▗▖▝▘ + ▄/▀ сверху/снизу давали ~50% —
+    --           кнопка выглядела как тонкая «таблетка», не как плотный rect.
     if el.rounded and el.cornerBg and el.w >= 2 then
       local btnBg = el.bg or 0x333333
       local cBg = el.cornerBg
@@ -724,17 +723,12 @@ function Renderer.draw(buf, el, absX, absY)
         buf:set(x,             y + 1, "▝", btnBg, cBg)
         buf:set(x + el.w - 1,  y + 1, "▘", btnBg, cBg)
       else
-        -- Верхняя строка: ▄ chars (top-half панель, bottom-half кнопка).
-        -- Нижняя строка: ▀ chars (top-half кнопка, bottom-half панель).
-        for i = 0, el.w - 1 do
-          buf:set(x + i, y,            "▄", btnBg, cBg)
-          buf:set(x + i, y + el.h - 1, "▀", btnBg, cBg)
-        end
-        -- Скруглённые концы: ▗▖ сверху, ▝▘ снизу.
-        buf:set(x,             y,             "▗", btnBg, cBg)
-        buf:set(x + el.w - 1,  y,             "▖", btnBg, cBg)
-        buf:set(x,             y + el.h - 1, "▝", btnBg, cBg)
-        buf:set(x + el.w - 1,  y + el.h - 1, "▘", btnBg, cBg)
+        -- 3-квадрантные углы: ▟ TL (top-left пустой), ▙ TR, ▜ BL, ▛ BR.
+        -- Середину верха/низа НЕ трогаем — там остаётся btnBg от P.rect.
+        buf:set(x,             y,             "▟", btnBg, cBg)
+        buf:set(x + el.w - 1,  y,             "▙", btnBg, cBg)
+        buf:set(x,             y + el.h - 1, "▜", btnBg, cBg)
+        buf:set(x + el.w - 1,  y + el.h - 1, "▛", btnBg, cBg)
       end
     end
     local lbl = el.label or ""
