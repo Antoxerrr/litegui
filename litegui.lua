@@ -700,19 +700,34 @@ function Renderer.draw(buf, el, absX, absY)
     if el.border then
       P.border(buf, x, y, el.w, el.h, el.border, el.bg, el.borderStyle or "rounded")
     end
-    -- Скругление: для h>=2 — квадрант-блоки в углах (3/4 заливки кнопки + 1/4 фона).
-    -- Для h=1 — pill-форма: ▐ слева, ▌ справа (полуцейли по бокам).
+    -- Скругление кнопки:
+    --   h=1       — pill: ▐ слева, ▌ справа (полуцейли по бокам).
+    --   h=2       — soft pill: row 1 — лейбл на полном фоне с углами ▟▙ сверху;
+    --               row 2 — ▀ chars (верх=кнопка, низ=панель) с ▝▘ по углам.
+    --               Визуальная высота ~1.5 char-row — компактно и аккуратно.
+    --   h>=3      — классические квадрант-углы ▟▙▜▛ (label на средней строке).
     if el.rounded and el.cornerBg and el.w >= 2 then
       local btnBg = el.bg or 0x333333
       local cBg = el.cornerBg
-      if el.h >= 2 then
+      if el.h == 1 then
+        buf:set(x,             y, "▐", btnBg, cBg)
+        buf:set(x + el.w - 1,  y, "▌", btnBg, cBg)
+      elseif el.h == 2 then
+        -- Нижнюю строку перекрашиваем в ▀ (упрощённо: проходим по всей ширине).
+        for i = 0, el.w - 1 do
+          buf:set(x + i, y + 1, "▀", btnBg, cBg)
+        end
+        -- Верхние углы (label row): notch по внешним углам.
+        buf:set(x,             y,     "▟", btnBg, cBg)
+        buf:set(x + el.w - 1,  y,     "▙", btnBg, cBg)
+        -- Нижние углы (▀ row): только один внутренний квадрант — мягкий загиб.
+        buf:set(x,             y + 1, "▝", btnBg, cBg)
+        buf:set(x + el.w - 1,  y + 1, "▘", btnBg, cBg)
+      else
         buf:set(x,             y,             "▟", btnBg, cBg)
         buf:set(x + el.w - 1,  y,             "▙", btnBg, cBg)
         buf:set(x,             y + el.h - 1,  "▜", btnBg, cBg)
         buf:set(x + el.w - 1,  y + el.h - 1,  "▛", btnBg, cBg)
-      else
-        buf:set(x,             y, "▐", btnBg, cBg)
-        buf:set(x + el.w - 1,  y, "▌", btnBg, cBg)
       end
     end
     local lbl = el.label or ""

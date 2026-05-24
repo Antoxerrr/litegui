@@ -116,10 +116,11 @@ local function buildReactorCard(reactor, index, bus, isStale)
     el.text { x = 2, y = 8, text = "ОХЛ", fg = C.dim },
     el.text { x = 8, y = 8, text = coolantText, fg = C.cyan },
 
-    -- Кнопка h=1 pill: ▐ слева, ▌ справа (полуцейли) — тонкая, аккуратная.
-    -- w=11 = "Отключить" (9) + 1/1 padding. x=8 центрирует в карточке w=25.
+    -- Кнопка h=2 soft pill: верхняя строка — лейбл на полной заливке с ▟▙
+    -- углами; нижняя строка — ▀ chars с ▝▘ по краям (полу-pixel закругление).
+    -- w=13 = "Отключить" (9) + 2/2 padding. x=7 центрирует в карточке w=25.
     el.button {
-      x = 8, y = 10, w = 11, h = 1,
+      x = 7, y = 9, w = 13, h = 2,
       bg = toggleBg, fg = toggleFg,
       label = toggleLabel,
       rounded = true, cornerBg = C.panel,
@@ -194,17 +195,18 @@ local function buildSummaryAndControl(reactors, bus)
       el.text { x = 2, y = 3,  text = "Генерация", fg = C.dim },
       el.text { x = 13, y = 3, text = fmtRF(totalGen) .. " mRF/t", fg = C.green },
 
-      -- Pill-кнопки h=1 (▐ слева, ▌ справа). w=15 = "Отключить все" (13)
-      -- + 1/1 padding. Для "Включить все" (12) асимметрия ±1 cell.
+      -- Soft pill h=2 (1.5 char-row визуально, ▟▙ сверху + ▀ снизу).
+      -- w=17 = "Отключить все" (13) + 2/2 padding. Для "Включить все"
+      -- (12) — ±1 cell асимметрии.
       el.button {
-        x = 23, y = 5, w = 15, h = 1,
+        x = 22, y = 5, w = 17, h = 2,
         bg = C.green, fg = 0x000000,
         label = "Включить все",
         rounded = true, cornerBg = C.panel,
         onClick = bulk("on"),
       },
       el.button {
-        x = 23, y = 7, w = 15, h = 1,
+        x = 22, y = 8, w = 17, h = 2,
         bg = C.red, fg = C.white,
         label = "Отключить все",
         rounded = true, cornerBg = C.panel,
