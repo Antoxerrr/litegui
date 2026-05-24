@@ -14,10 +14,11 @@
 --  Запуск:  agent
 --  Выход:   Q / Esc / Ctrl+Alt+C
 -- ============================================================
-local component = require("component")
-local computer  = require("computer")
-local event     = require("event")
-local proto     = require("lgm.protocol")
+local component  = require("component")
+local computer   = require("computer")
+local event      = require("event")
+local fs         = require("filesystem")
+local proto      = require("lgm.protocol")
 
 -- Sanity check: если require отдал устаревший lgm.protocol (без encodeSnap),
 -- падаем сразу с понятным сообщением и печатаем фактический путь модуля —
@@ -45,14 +46,34 @@ end
 
 
 -- ── Drivers ──────────────────────────────────────────────
+-- Драйверы подгружаются автоматически из /lib/lgm/drivers/.
+-- Агент не требует наличия конкретных драйверов — юзает то, что установлено.
 local drivers = {}
 local function registerDriver(d)
   drivers[d.id] = d
   d._lastPoll = 0
 end
 
-registerDriver(require("lgm.drivers.reactor"))
-registerDriver(require("lgm.drivers.flux"))
+local DRIVERS_DIR = "/lib/lgm/drivers"
+if fs.exists(DRIVERS_DIR) and fs.isDirectory(DRIVERS_DIR) then
+  for entry in fs.list(DRIVERS_DIR) do
+    local name = entry:match("^(.+)%.lua$")
+    if name then
+      local ok, drv = pcall(require, "lgm.drivers." .. name)
+      if ok and type(drv) == "table" and drv.id then
+        registerDriver(drv)
+      else
+        io.stderr:write(("agent: failed to load driver '%s': %s\n"):format(
+          name, tostring(drv)))
+      end
+    end
+  end
+end
+
+if next(drivers) == nil then
+  error("agent: no drivers installed in " .. DRIVERS_DIR ..
+        " (run: install.lua agent <driver>...)")
+end
 
 -- ── Modem ────────────────────────────────────────────────
 if not component.isAvailable("modem") then

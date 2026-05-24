@@ -7,7 +7,7 @@
 --
 --  Layout (160×50):
 --    h=1   статус-бар (Q — выход + индикатор связи)
---    h=13  ряд из 6 компактных вертикальных карточек реакторов (≈25×13)
+--    h=11  ряд из 6 компактных вертикальных карточек реакторов (≈25×11)
 --    h=14  нижний ряд: сводка+управление | flux
 --  Снизу остаётся пустой фон — дашборду не нужны все 50 строк.
 -- ============================================================
@@ -62,7 +62,7 @@ end
 
 local function safe(v, default) if v == nil then return default end; return v end
 
--- ── Вертикальная карточка реактора (~25×13, компактная) ──
+-- ── Вертикальная карточка реактора (~25×11, компактная) ──
 local function buildReactorCard(reactor, index, bus, isStale)
   local r = reactor
   local active = safe(r.active, false)
@@ -98,32 +98,30 @@ local function buildReactorCard(reactor, index, bus, isStale)
   local children = {
     el.badge { x = badgeX, y = 1, label = statusText, bg = statusBg, fg = statusFg },
 
-    el.text { x = 2, y = 2, text = addr,    fg = C.dim },
-    el.text { x = 2, y = 3, text = typeStr, fg = C.dim },
+    el.text { x = 2, y = 2, text = addr .. " · " .. typeStr, fg = C.dim },
 
     -- Нагрев: метка + значение в одну строку, бар ниже.
-    el.text { x = 2, y = 5, text = "НАГРЕВ", fg = C.dim },
-    el.text { x = 10, y = 5,
+    el.text { x = 2, y = 4, text = "НАГРЕВ", fg = C.dim },
+    el.text { x = 10, y = 4,
               text = (r.temp or 0) .. "/" .. (r.tempMax or 0),
               fg = tC },
-    el.progress { x = 2, y = 6, w = 21, value = tempPct, fgFill = tC, bg = C.panel2 },
+    el.progress { x = 2, y = 5, w = 21, value = tempPct, fgFill = tC, bg = C.panel2 },
 
     -- Ген и Охл — inline (label x=2, value x=8).
-    el.text { x = 2, y = 8, text = "ГЕН", fg = C.dim },
-    el.text { x = 8, y = 8,
+    el.text { x = 2, y = 7, text = "ГЕН", fg = C.dim },
+    el.text { x = 8, y = 7,
               text = fmtRF(r.gen) .. " mRF/t",
               fg = active and C.green or C.dim },
 
-    el.text { x = 2, y = 9, text = "ОХЛ", fg = C.dim },
-    el.text { x = 8, y = 9, text = coolantText, fg = C.cyan },
+    el.text { x = 2, y = 8, text = "ОХЛ", fg = C.dim },
+    el.text { x = 8, y = 8, text = coolantText, fg = C.cyan },
 
-    -- Кнопка h=3 в самом низу карточки h=13 (строки 11..13).
-    -- Лейбл рисуется на средней строке — не задевает корнер-блоки (▟▙▜▛).
+    -- Кнопка h=2, плоская (без rounded) — слим-вид, не пухлая.
+    -- y=9 — отступ от низа карточки (строка 11 остаётся пустым фоном).
     el.button {
-      x = 3, y = 11, w = 21, h = 3,
+      x = 3, y = 9, w = 21, h = 2,
       bg = toggleBg, fg = toggleFg,
       label = toggleLabel,
-      rounded = true, cornerBg = C.panel,
       onClick = function()
         if bus and r._node and r._addr then
           bus:sendCmd(r._node, "reactor", r._addr, toggleAction, {})
@@ -149,7 +147,7 @@ local function buildEmptySlot(index)
     titleFg = C.dim,
     rounded = true, cornerBg = C.bg,
     children = {
-      el.text { x = 2, y = 7, text = "не подключён", fg = C.dimmer },
+      el.text { x = 2, y = 6, text = "не подключён", fg = C.dimmer },
     }
   }
 end
@@ -305,7 +303,7 @@ function M.build(state, bus)
 
       -- РЕАКТОРЫ: 6 компактных вертикальных карточек в один ряд.
       el.grid {
-        h = 13, cols = 6, rows = 1, gap = 1,
+        h = 11, cols = 6, rows = 1, gap = 1,
         children = cards,
       },
 
