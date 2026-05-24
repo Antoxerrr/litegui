@@ -82,8 +82,26 @@ local function ensureDir(path)
   end
 end
 
+-- Если файл уже лежит где-то ещё в package.path (например /usr/lib/...
+-- или /home/lib/... — остатки старой ручной установки), require найдёт
+-- ЕГО раньше, чем нашу /lib-версию. Чистим все альтернативы до wget.
+local PATH_ALTERNATES = { "/usr/lib/", "/home/lib/", "/home/" }
+
+local function cleanupAlternates(dst)
+  if dst:sub(1, 5) ~= "/lib/" then return end
+  local rest = dst:sub(6)  -- "lgm/protocol.lua"
+  for _, root in ipairs(PATH_ALTERNATES) do
+    local alt = root .. rest
+    if alt ~= dst and fs.exists(alt) then
+      fs.remove(alt)
+      print("  - removed stale " .. alt)
+    end
+  end
+end
+
 local function download(src, dst)
   ensureDir(dst)
+  cleanupAlternates(dst)
   -- cache-buster, чтобы Fastly CDN не подсовывал stale-копию
   local url = BASE .. src .. "?v=" .. tostring(os.time())
   -- удаляем существующий, wget -f всё равно перезапишет, но так чище
