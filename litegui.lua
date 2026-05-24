@@ -629,6 +629,15 @@ function Renderer.draw(buf, el, absX, absY)
     if el.border then
       P.border(buf, x, y, w, h, el.border, el.bg, el.borderStyle or "rounded")
     end
+    -- Скругление углов через квадрант-блоки (см. button)
+    if el.rounded and el.cornerBg and w >= 2 and h >= 2 then
+      local pBg = el.bg or 0x000000
+      local cBg = el.cornerBg
+      buf:set(x,         y,         "▟", pBg, cBg)
+      buf:set(x + w - 1, y,         "▙", pBg, cBg)
+      buf:set(x,         y + h - 1, "▜", pBg, cBg)
+      buf:set(x + w - 1, y + h - 1, "▛", pBg, cBg)
+    end
     if el.title then
       local title = " " .. el.title .. " "
       P.text(buf, x + 2, y, title, el.titleFg or el.border or 0xFFFFFF, el.bg or 0x000000)
@@ -690,6 +699,16 @@ function Renderer.draw(buf, el, absX, absY)
     P.rect(buf, x, y, el.w, el.h, el.bg or 0x333333)
     if el.border then
       P.border(buf, x, y, el.w, el.h, el.border, el.bg, el.borderStyle or "rounded")
+    end
+    -- Скругление углов через квадрант-блоки: в углу 3/4 заливается
+    -- цветом кнопки, 1/4 — цветом родителя (cornerBg).
+    if el.rounded and el.cornerBg and el.w >= 2 and el.h >= 2 then
+      local btnBg = el.bg or 0x333333
+      local cBg = el.cornerBg
+      buf:set(x,             y,             "▟", btnBg, cBg)
+      buf:set(x + el.w - 1,  y,             "▙", btnBg, cBg)
+      buf:set(x,             y + el.h - 1,  "▜", btnBg, cBg)
+      buf:set(x + el.w - 1,  y + el.h - 1,  "▛", btnBg, cBg)
     end
     local lbl = el.label or ""
     local lx = x + math.floor((el.w - unicode.len(lbl)) / 2)

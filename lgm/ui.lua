@@ -15,24 +15,23 @@ local el  = GUI.el
 
 local M = {}
 
--- ── Палитра ──────────────────────────────────────────────
+-- ── Палитра (насыщенная) ─────────────────────────────────
 local C = {
-  bg       = 0x0F0F1A,
-  panel    = 0x1A1A2E,
-  panel2   = 0x252540,
-  panel3   = 0x1F1F38,
-  border   = 0x3D3D5C,
+  bg       = 0x0B0B14,   -- фон экрана
+  panel    = 0x1B1B30,   -- фон карточки
+  panel2   = 0x2A2A45,   -- фон прогресс-бара
+  panel3   = 0x14141F,   -- фон пустого слота
   shadow   = 0x05050A,
-  accent   = 0xA78BFA,
-  blue     = 0x60A5FA,
-  green    = 0x4ADE80,
-  yellow   = 0xFBBF24,
-  orange   = 0xFB923C,
-  red      = 0xF87171,
-  cyan     = 0x22D3EE,
+  accent   = 0x8B5CF6,   -- фиолетовый, плотный
+  blue     = 0x3B82F6,
+  green    = 0x22C55E,
+  yellow   = 0xEAB308,
+  orange   = 0xF97316,
+  red      = 0xEF4444,
+  cyan     = 0x06B6D4,
   white    = 0xF8FAFC,
-  dim      = 0x64748B,
-  dimmer   = 0x3A4256,
+  dim      = 0x6B7280,
+  dimmer   = 0x374151,
 }
 M.colors = C
 
@@ -90,12 +89,11 @@ local function buildReactorCard(reactor, index, bus, isStale)
 
   return el.panel {
     bg = isStale and C.panel3 or C.panel,
-    border = isStale and C.dimmer or C.border,
     title = title,
     titleFg = isStale and C.dim or C.accent,
-    shadow = true, shadowColor = C.shadow,
+    rounded = true, cornerBg = C.bg,
     children = {
-      -- Статус-бэдж в правом верхнем углу (накладывается на верхнюю рамку)
+      -- Статус-бэдж в правом верхнем углу
       el.badge { x = 52 - 6, y = 1, label = statusText, bg = statusBg, fg = statusFg },
 
       -- Адрес + тип
@@ -122,12 +120,12 @@ local function buildReactorCard(reactor, index, bus, isStale)
                        or  ((r.coolantConsume or 0) .. " mb/s"),
                 fg = C.cyan },
 
-      -- Кнопка вкл/выкл — залитая
+      -- Кнопка вкл/выкл — залитая, со скруглением
       el.button {
         x = 2, y = 8, w = 48, h = 2,
         bg = toggleBg, fg = toggleFg,
         label = toggleLabel,
-        shadow = true, shadowColor = C.shadow,
+        rounded = true, cornerBg = C.panel,
         onClick = function()
           if bus and r._node and r._addr then
             bus:sendCmd(r._node, "reactor", r._addr, toggleAction, {})
@@ -141,10 +139,10 @@ end
 -- ── Пустой слот ──────────────────────────────────────────
 local function buildEmptySlot(index)
   return el.panel {
-    bg = C.panel3, border = C.dimmer,
+    bg = C.panel3,
     title = "Реактор " .. tostring(index),
     titleFg = C.dim,
-    shadow = true, shadowColor = C.shadow,
+    rounded = true, cornerBg = C.bg,
     children = {
       el.text { x = 2, y = 5, text = "не подключён", fg = C.dimmer },
     }
@@ -164,8 +162,8 @@ local function buildReactorsSummary(reactors)
 
   return el.panel {
     w = 50,
-    bg = C.panel, border = C.border, title = "Сводка", titleFg = C.accent,
-    shadow = true, shadowColor = C.shadow,
+    bg = C.panel, title = "Сводка", titleFg = C.accent,
+    rounded = true, cornerBg = C.bg,
     children = {
       el.text { x = 2, y = 2, text = "Активны",  fg = C.dim },
       el.text { x = 13, y = 2,
@@ -205,21 +203,21 @@ local function buildBulkControls(reactors, bus)
 
   return el.panel {
     w = 40,
-    bg = C.panel, border = C.border, title = "Управление", titleFg = C.accent,
-    shadow = true, shadowColor = C.shadow,
+    bg = C.panel, title = "Управление", titleFg = C.accent,
+    rounded = true, cornerBg = C.bg,
     children = {
       el.button {
         x = 2, y = 2, w = 36, h = 3,
         bg = C.green, fg = 0x000000,
         label = "ВКЛЮЧИТЬ ВСЕ",
-        shadow = true, shadowColor = C.shadow,
+        rounded = true, cornerBg = C.panel,
         onClick = bulk("on"),
       },
       el.button {
         x = 2, y = 6, w = 36, h = 3,
         bg = C.red, fg = C.white,
         label = "ОТКЛЮЧИТЬ ВСЕ",
-        shadow = true, shadowColor = C.shadow,
+        rounded = true, cornerBg = C.panel,
         onClick = bulk("off"),
       },
     }
@@ -232,9 +230,9 @@ local function buildFluxPanel(fluxList)
   if not f then
     return el.panel {
       flex = 1,
-      bg = C.panel, border = C.border,
+      bg = C.panel,
       title = "Flux сеть", titleFg = C.accent,
-      shadow = true, shadowColor = C.shadow,
+      rounded = true, cornerBg = C.bg,
       children = {
         el.text { x = 2, y = 2, text = "нет flux сети", fg = C.dim },
       }
@@ -251,10 +249,10 @@ local function buildFluxPanel(fluxList)
 
   return el.panel {
     flex = 1,
-    bg = C.panel, border = C.border,
+    bg = C.panel,
     title = "Flux · " .. (f.netName or "?"),
     titleFg = C.accent,
-    shadow = true, shadowColor = C.shadow,
+    rounded = true, cornerBg = C.bg,
     children = {
       el.text { x = 2, y = 2,
                 text = "id " .. tostring(f.netId) .. " · " .. (f.energyType or ""),
