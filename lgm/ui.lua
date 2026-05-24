@@ -7,7 +7,7 @@
 --
 --  Layout (160×50):
 --    h=1   статус-бар (Q — выход + индикатор связи)
---    h=12  ряд из 6 компактных вертикальных карточек реакторов (≈25×12)
+--    h=11  ряд из 6 компактных вертикальных карточек реакторов (≈25×11)
 --    h=14  нижний ряд: сводка+управление | flux
 --  Снизу остаётся пустой фон — дашборду не нужны все 50 строк.
 -- ============================================================
@@ -62,7 +62,7 @@ end
 
 local function safe(v, default) if v == nil then return default end; return v end
 
--- ── Вертикальная карточка реактора (~25×12, компактная) ──
+-- ── Вертикальная карточка реактора (~25×11, компактная) ──
 local function buildReactorCard(reactor, index, bus, isStale)
   local r = reactor
   local active = safe(r.active, false)
@@ -116,13 +116,10 @@ local function buildReactorCard(reactor, index, bus, isStale)
     el.text { x = 2, y = 8, text = "ОХЛ", fg = C.dim },
     el.text { x = 8, y = 8, text = coolantText, fg = C.cyan },
 
-    -- Кнопка h=3, скруглённая. Лейбл рисуется на СРЕДНЕЙ строке (ly=y+1) —
-    -- эта строка не содержит угловых блоков ▟▙▜▛, поэтому центр визуально
-    -- совпадает с математическим. На h=2 углы съедают полцейли по верху
-    -- и текст кажется сдвинутым влево.
-    -- w=15 центрирована в карточке w=25 (5 cells фона слева/справа).
+    -- Кнопка h=1 pill: ▐ слева, ▌ справа (полуцейли) — тонкая, аккуратная.
+    -- w=11 = "Отключить" (9) + 1/1 padding. x=8 центрирует в карточке w=25.
     el.button {
-      x = 6, y = 9, w = 15, h = 3,
+      x = 8, y = 10, w = 11, h = 1,
       bg = toggleBg, fg = toggleFg,
       label = toggleLabel,
       rounded = true, cornerBg = C.panel,
@@ -197,17 +194,17 @@ local function buildSummaryAndControl(reactors, bus)
       el.text { x = 2, y = 3,  text = "Генерация", fg = C.dim },
       el.text { x = 13, y = 3, text = fmtRF(totalGen) .. " mRF/t", fg = C.green },
 
-      -- Кнопки. w=46 (чёт): ВКЛЮЧИТЬ ВСЕ (12, чёт) — идеально по центру;
-      -- ОТКЛЮЧИТЬ ВСЕ (13, нечёт) — ±1.
+      -- Pill-кнопки h=1 (▐ слева, ▌ справа). w=15 = "Отключить все" (13)
+      -- + 1/1 padding. Для "Включить все" (12) асимметрия ±1 cell.
       el.button {
-        x = 8, y = 5, w = 46, h = 3,
+        x = 23, y = 5, w = 15, h = 1,
         bg = C.green, fg = 0x000000,
         label = "Включить все",
         rounded = true, cornerBg = C.panel,
         onClick = bulk("on"),
       },
       el.button {
-        x = 8, y = 9, w = 46, h = 3,
+        x = 23, y = 7, w = 15, h = 1,
         bg = C.red, fg = C.white,
         label = "Отключить все",
         rounded = true, cornerBg = C.panel,
@@ -307,7 +304,7 @@ function M.build(state, bus)
 
       -- РЕАКТОРЫ: 6 компактных вертикальных карточек в один ряд.
       el.grid {
-        h = 12, cols = 6, rows = 1, gap = 1,
+        h = 11, cols = 6, rows = 1, gap = 1,
         children = cards,
       },
 

@@ -700,15 +700,20 @@ function Renderer.draw(buf, el, absX, absY)
     if el.border then
       P.border(buf, x, y, el.w, el.h, el.border, el.bg, el.borderStyle or "rounded")
     end
-    -- Скругление углов через квадрант-блоки: в углу 3/4 заливается
-    -- цветом кнопки, 1/4 — цветом родителя (cornerBg).
-    if el.rounded and el.cornerBg and el.w >= 2 and el.h >= 2 then
+    -- Скругление: для h>=2 — квадрант-блоки в углах (3/4 заливки кнопки + 1/4 фона).
+    -- Для h=1 — pill-форма: ▐ слева, ▌ справа (полуцейли по бокам).
+    if el.rounded and el.cornerBg and el.w >= 2 then
       local btnBg = el.bg or 0x333333
       local cBg = el.cornerBg
-      buf:set(x,             y,             "▟", btnBg, cBg)
-      buf:set(x + el.w - 1,  y,             "▙", btnBg, cBg)
-      buf:set(x,             y + el.h - 1,  "▜", btnBg, cBg)
-      buf:set(x + el.w - 1,  y + el.h - 1,  "▛", btnBg, cBg)
+      if el.h >= 2 then
+        buf:set(x,             y,             "▟", btnBg, cBg)
+        buf:set(x + el.w - 1,  y,             "▙", btnBg, cBg)
+        buf:set(x,             y + el.h - 1,  "▜", btnBg, cBg)
+        buf:set(x + el.w - 1,  y + el.h - 1,  "▛", btnBg, cBg)
+      else
+        buf:set(x,             y, "▐", btnBg, cBg)
+        buf:set(x + el.w - 1,  y, "▌", btnBg, cBg)
+      end
     end
     local lbl = el.label or ""
     local lx = x + math.floor((el.w - unicode.len(lbl)) / 2)
